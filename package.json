@@ -1,0 +1,16 @@
+{
+  "name": "whip-up",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Kitchen ingredient-based recipe finder with EN/PL support",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

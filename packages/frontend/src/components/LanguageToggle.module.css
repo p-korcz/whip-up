@@ -1,0 +1,31 @@
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.current {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.divider {
+  color: var(--color-text-muted);
+}
+
+.next {
+  color: var(--color-text-secondary);
+}
