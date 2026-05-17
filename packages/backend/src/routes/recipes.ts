@@ -1,6 +1,6 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
-import { searchRecipes, getRecipeById } from '../services/qdrant.js';
+import { searchRecipes, getRecipeById } from '../services/elasticsearch.js';
 
 const router: IRouter = Router();
 

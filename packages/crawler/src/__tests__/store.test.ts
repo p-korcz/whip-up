@@ -1,19 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockClient = vi.hoisted(() => ({
-  getCollections: vi.fn().mockResolvedValue({ collections: [] }),
-  createCollection: vi.fn().mockResolvedValue({}),
-  createPayloadIndex: vi.fn().mockResolvedValue({}),
-  upsert: vi.fn().mockResolvedValue({}),
-  retrieve: vi.fn().mockResolvedValue([]),
-  getCollection: vi.fn().mockResolvedValue({ points_count: 42 }),
+  indices: {
+    exists: vi.fn().mockResolvedValue(false),
+    create: vi.fn().mockResolvedValue({}),
+  },
+  index: vi.fn().mockResolvedValue({}),
+  exists: vi.fn().mockResolvedValue(false),
+  count: vi.fn().mockResolvedValue({ count: 42 }),
 }));
 
-vi.mock('@qdrant/js-client-rest', () => ({
-  QdrantClient: vi.fn().mockImplementation(() => mockClient),
+vi.mock('@elastic/elasticsearch', () => ({
+  Client: vi.fn().mockImplementation(() => mockClient),
 }));
 
-import { recipeId, ensureCollection, countRecipes, recipeExists, upsertRecipe } from '../services/store.js';
+import { recipeId, ensureIndex, countRecipes, recipeExists, upsertRecipe } from '../services/store.js';
 
 const samplePayload = {
   id: 'will-be-overwritten-by-recipeId',
@@ -54,53 +55,52 @@ describe('recipeId', () => {
 describe('store operations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockClient.getCollections.mockResolvedValue({ collections: [] });
-    mockClient.createCollection.mockResolvedValue({});
-    mockClient.createPayloadIndex.mockResolvedValue({});
-    mockClient.upsert.mockResolvedValue({});
-    mockClient.retrieve.mockResolvedValue([]);
-    mockClient.getCollection.mockResolvedValue({ points_count: 42 });
+    mockClient.indices.exists.mockResolvedValue(false);
+    mockClient.indices.create.mockResolvedValue({});
+    mockClient.index.mockResolvedValue({});
+    mockClient.exists.mockResolvedValue(false);
+    mockClient.count.mockResolvedValue({ count: 42 });
   });
 
-  it('ensureCollection creates collection when missing', async () => {
-    await ensureCollection();
-    expect(mockClient.getCollections).toHaveBeenCalled();
-    expect(mockClient.createCollection).toHaveBeenCalled();
+  it('ensureIndex creates index when missing', async () => {
+    await ensureIndex();
+    expect(mockClient.indices.exists).toHaveBeenCalled();
+    expect(mockClient.indices.create).toHaveBeenCalled();
   });
 
-  it('ensureCollection skips creation when collection exists', async () => {
-    mockClient.getCollections.mockResolvedValue({ collections: [{ name: 'recipes' }] });
-    await ensureCollection();
-    expect(mockClient.createCollection).not.toHaveBeenCalled();
+  it('ensureIndex skips creation when index exists', async () => {
+    mockClient.indices.exists.mockResolvedValue(true);
+    await ensureIndex();
+    expect(mockClient.indices.create).not.toHaveBeenCalled();
   });
 
-  it('countRecipes returns point count from collection info', async () => {
+  it('countRecipes returns count from response', async () => {
     const count = await countRecipes();
     expect(count).toBe(42);
   });
 
-  it('recipeExists returns false when retrieve returns empty', async () => {
+  it('recipeExists returns false when exists returns false', async () => {
     const exists = await recipeExists('https://example.com/pasta');
     expect(exists).toBe(false);
   });
 
-  it('recipeExists returns true when retrieve returns a point', async () => {
-    mockClient.retrieve.mockResolvedValue([{ id: 'some-id' }]);
+  it('recipeExists returns true when exists returns true', async () => {
+    mockClient.exists.mockResolvedValue(true);
     const exists = await recipeExists('https://example.com/pasta');
     expect(exists).toBe(true);
   });
 
-  it('upsertRecipe calls qdrant.upsert with deterministic id', async () => {
+  it('upsertRecipe calls client.index with deterministic id', async () => {
     await upsertRecipe('https://example.com/pasta', samplePayload);
-    expect(mockClient.upsert).toHaveBeenCalled();
-    const call = mockClient.upsert.mock.calls[0];
-    expect(call[1].points[0].id).toBe(recipeId('https://example.com/pasta'));
+    expect(mockClient.index).toHaveBeenCalled();
+    const call = mockClient.index.mock.calls[0][0];
+    expect(call.id).toBe(recipeId('https://example.com/pasta'));
   });
 
   it('upsertRecipe stores bilingual payload fields', async () => {
     await upsertRecipe('https://example.com/pasta', samplePayload);
-    const call = mockClient.upsert.mock.calls[0];
-    const stored = call[1].points[0].payload;
+    const call = mockClient.index.mock.calls[0][0];
+    const stored = call.document;
     expect(stored.title_en).toBe('Pasta Carbonara');
     expect(stored.title_pl).toBe('Makaron Carbonara');
     expect(stored.description_en).toBe('Classic Italian pasta');
@@ -113,8 +113,8 @@ describe('store operations', () => {
     const url = 'https://example.com/pasta';
     const payloadWithId = { ...samplePayload, id: recipeId(url) };
     await upsertRecipe(url, payloadWithId);
-    const call = mockClient.upsert.mock.calls[0];
-    const stored = call[1].points[0].payload;
+    const call = mockClient.index.mock.calls[0][0];
+    const stored = call.document;
     expect(stored.id).toBe(recipeId(url));
   });
 });

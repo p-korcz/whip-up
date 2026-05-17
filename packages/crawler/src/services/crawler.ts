@@ -6,7 +6,6 @@ import { SITES } from '../sources/index.js';
 import type { RecipePayload } from '../types/index.js';
 
 const CONCURRENCY = 3;
-const TARGET = 5000;
 
 interface CrawlStats {
   discovered: number;
@@ -78,12 +77,6 @@ export async function crawl(): Promise<void> {
   const limit = pLimit(CONCURRENCY);
 
   for (const site of SITES) {
-    const currentCount = await countRecipes();
-    if (currentCount >= TARGET) {
-      console.log(`\nReached target of ${TARGET} recipes. Stopping.`);
-      break;
-    }
-
     console.log(`\nCrawling ${site.name} (${site.lang})...`);
 
     const indexUrls = [...site.indexUrls];
@@ -97,7 +90,6 @@ export async function crawl(): Promise<void> {
     for (const indexUrl of indexUrls) {
       const links = await discoverRecipeLinks(indexUrl, site.recipePattern);
       links.forEach((l) => recipeUrls.add(l));
-      if (recipeUrls.size > TARGET / SITES.length) break;
     }
 
     stats.discovered += recipeUrls.size;

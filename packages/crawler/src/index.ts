@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { ensureCollection, countRecipes } from './services/store.js';
+import { ensureIndex, countRecipes } from './services/store.js';
 import { crawl } from './services/crawler.js';
 
 async function main(): Promise<void> {
@@ -10,25 +10,18 @@ async function main(): Promise<void> {
   }
 
   console.log('Whip Up recipe crawler starting...');
-  console.log(`Qdrant: ${process.env['QDRANT_URL'] ?? 'http://localhost:6333'}`);
-  console.log(`Collection: ${process.env['QDRANT_COLLECTION'] ?? 'recipes'}`);
+  console.log(`Elasticsearch: ${process.env['ELASTICSEARCH_URL'] ?? 'http://localhost:9200'}`);
+  console.log(`Index: ${process.env['ELASTICSEARCH_INDEX'] ?? 'recipes'}`);
 
-  await ensureCollection();
+  await ensureIndex();
 
-  const existing = await countRecipes();
-  console.log(`Existing recipes in collection: ${existing}`);
+  const before = await countRecipes();
+  console.log(`Existing recipes: ${before}`);
 
   await crawl();
 
-  const final = await countRecipes();
-  console.log(`\nFinal recipe count: ${final}`);
-
-  if (final < 5000) {
-    console.warn(`Warning: target of 5000 not reached (got ${final})`);
-    process.exit(1);
-  }
-
-  process.exit(0);
+  const after = await countRecipes();
+  console.log(`\nRun complete. Recipes: ${before} → ${after} (+${after - before} new)`);
 }
 
 main().catch((err) => {

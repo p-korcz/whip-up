@@ -1,36 +1,11 @@
-import { QdrantClient } from '@qdrant/js-client-rest';
+import { Client } from '@elastic/elasticsearch';
 import { createHash } from 'crypto';
 import type { RecipePayload } from '../types/index.js';
 
-const QDRANT_URL = process.env['QDRANT_URL'] ?? 'http://localhost:6333';
-const COLLECTION = process.env['QDRANT_COLLECTION'] ?? 'recipes';
+const ELASTICSEARCH_URL = process.env['ELASTICSEARCH_URL'] ?? 'http://localhost:9200';
+const INDEX = process.env['ELASTICSEARCH_INDEX'] ?? 'recipes';
 
-const VECTOR_SIZE = 1;
-
-export const qdrant = new QdrantClient({ url: QDRANT_URL });
-
-export async function ensureCollection(): Promise<void> {
-  const collections = await qdrant.getCollections();
-  const exists = collections.collections.some((c) => c.name === COLLECTION);
-
-  if (!exists) {
-    await qdrant.createCollection(COLLECTION, {
-      vectors: { size: VECTOR_SIZE, distance: 'Cosine' },
-    });
-
-    await qdrant.createPayloadIndex(COLLECTION, {
-      field_name: 'language_origin',
-      field_schema: 'keyword',
-    });
-
-    await qdrant.createPayloadIndex(COLLECTION, {
-      field_name: 'source_page',
-      field_schema: 'keyword',
-    });
-
-    console.log(`Created Qdrant collection: ${COLLECTION}`);
-  }
-}
+export const client = new Client({ node: ELASTICSEARCH_URL });
 
 /** Deterministic UUID-style ID from the recipe's direct URL */
 export function recipeId(url: string): string {
@@ -44,31 +19,53 @@ export function recipeId(url: string): string {
   ].join('-');
 }
 
+export async function ensureIndex(): Promise<void> {
+  const exists = await client.indices.exists({ index: INDEX });
+
+  if (!exists) {
+    await client.indices.create({
+      index: INDEX,
+      body: {
+        mappings: {
+          properties: {
+            title_en: { type: 'text' },
+            title_pl: { type: 'text' },
+            description_en: { type: 'text' },
+            description_pl: { type: 'text' },
+            author: { type: 'keyword' },
+            ingredients_en: { type: 'keyword' },
+            ingredients_pl: { type: 'keyword' },
+            steps_en: { type: 'text' },
+            steps_pl: { type: 'text' },
+            source_page: { type: 'keyword' },
+            direct_url: { type: 'keyword' },
+            language_origin: { type: 'keyword' },
+            created_at: { type: 'date' },
+            imageUrl: { type: 'keyword' },
+          },
+        },
+      },
+    });
+
+    console.log(`Created Elasticsearch index: ${INDEX}`);
+  }
+}
+
 export async function upsertRecipe(url: string, payload: RecipePayload): Promise<void> {
   const id = recipeId(url);
-  await qdrant.upsert(COLLECTION, {
-    wait: true,
-    points: [
-      {
-        id,
-        vector: [0],
-        payload: payload as unknown as Record<string, unknown>,
-      },
-    ],
+  await client.index({
+    index: INDEX,
+    id,
+    document: payload as unknown as Record<string, unknown>,
   });
 }
 
 export async function recipeExists(url: string): Promise<boolean> {
   const id = recipeId(url);
-  const results = await qdrant.retrieve(COLLECTION, {
-    ids: [id],
-    with_payload: false,
-    with_vector: false,
-  });
-  return results.length > 0;
+  return client.exists({ index: INDEX, id });
 }
 
 export async function countRecipes(): Promise<number> {
-  const info = await qdrant.getCollection(COLLECTION);
-  return info.points_count ?? 0;
+  const response = await client.count({ index: INDEX });
+  return response.count;
 }

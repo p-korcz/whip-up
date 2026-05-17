@@ -1,6 +1,6 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
-import { autocompleteIngredients } from '../services/qdrant.js';
+import { autocompleteIngredients } from '../services/elasticsearch.js';
 
 const router: IRouter = Router();
 

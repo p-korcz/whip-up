@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 
-vi.mock('../services/qdrant.js', () => ({
+vi.mock('../services/elasticsearch.js', () => ({
   autocompleteIngredients: vi.fn(),
   searchRecipes: vi.fn(),
   getRecipeById: vi.fn(),
 }));
 
-import { autocompleteIngredients, searchRecipes, getRecipeById } from '../services/qdrant.js';
+import { autocompleteIngredients, searchRecipes, getRecipeById } from '../services/elasticsearch.js';
 
 const app = createApp();
 
